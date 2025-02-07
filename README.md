@@ -1,2 +1,12 @@
-# Data_analysis_dicoding
-this is the repository  Project for "Belajar Data Analisis dengan Python by Dicoding"
+# Dashboard✨
+
+## Setup environment
+```
+pip install numpy pandas  matplotlib seaborn  streamlit babel
+```
+## Make sure the Dataset 'analysis.csv' has been read before!
+
+## Run steamlit app
+```
+streamlit run dashboard.py
+```
