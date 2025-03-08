@@ -5,112 +5,145 @@ import streamlit as st
 import numpy as np
 
 # Load dataset
-hour_df = pd.read_csv('analysis.csv')
-hour_df['dteday'] = pd.to_datetime(hour_df['dteday'])  # Pastikan kolom tanggal dalam format datetime
+file_path = "analysis.csv"
+hour_df = pd.read_csv(file_path)
 
-# Set the page title
-st.set_page_config(page_title='Bike Sharing Dashboard', page_icon=':bike:')
+# Konversi kolom tanggal ke format datetime
+hour_df['dteday'] = pd.to_datetime(hour_df['dteday'])
 
-# Set the sidebar image
+# Mapping untuk musim & kondisi cuaca
+season_mapping = {1: "Musim Semi", 2: "Musim Panas", 3: "Musim Gugur", 4: "Musim Dingin"}
+weather_mapping = {1: "Cerah", 2: "Berawan", 3: "Hujan Ringan", 4: "Hujan Lebat"}
+
+# 🎨 Atur Tampilan Dashboard
+st.set_page_config(page_title='🚴 Bike Sharing Dashboard', page_icon='🚲')
+
+# 🖼️ Tambahkan Gambar di Sidebar
 st.sidebar.image("https://3.bp.blogspot.com/_UaJWUMI3LDg/TOS0kZnRCCI/AAAAAAAAAB4/nodyhhiM1PY/s1600/CIMG0443.JPG", 
-                 caption='Bike Sharing Dataset')
+                 caption='Nikmati perjalanan sepeda Anda!')
 
-# Sidebar filters
-st.sidebar.header("Filter Data")
+# 🎛️ Sidebar untuk Filter Data
+st.sidebar.header("🎚️ Sesuaikan Tampilan Data")
 
-# Filter berdasarkan rentang tanggal
-date_range = st.sidebar.date_input("Pilih Rentang Tanggal", 
+# 📆 Filter Tanggal
+date_range = st.sidebar.date_input("📅 Pilih Rentang Tanggal", 
                                    [hour_df['dteday'].min(), hour_df['dteday'].max()],
                                    min_value=hour_df['dteday'].min(),
                                    max_value=hour_df['dteday'].max())
 
-# Filter berdasarkan musim (season_y)
-season_mapping = {1: "Spring", 2: "Summer", 3: "Fall", 4: "Winter"}
+# 🌤️ Filter Musim
 season_options = [season_mapping[s] for s in hour_df['season_y'].unique()]
-selected_season = st.sidebar.selectbox("Pilih Musim", season_options)
-selected_season_num = [k for k, v in season_mapping.items() if v == selected_season][0]
+selected_season = st.sidebar.multiselect("🍂 Pilih Musim", season_options, default=season_options)
+selected_season_num = [k for k, v in season_mapping.items() if v in selected_season]
 
-# Filter berdasarkan kondisi cuaca (weathersit_y)
-weather_mapping = {1: "Clear", 2: "Cloudy", 3: "Light Rain", 4: "Heavy Rain"}
+# ☁️ Filter Cuaca
 weather_options = [weather_mapping[w] for w in hour_df['weathersit_y'].unique()]
-selected_weather = st.sidebar.multiselect("Pilih Kondisi Cuaca", weather_options, default=weather_options)
+selected_weather = st.sidebar.multiselect("⛅ Pilih Kondisi Cuaca", weather_options, default=weather_options)
 selected_weather_num = [k for k, v in weather_mapping.items() if v in selected_weather]
 
-# Terapkan filter ke dataset
-filtered_df = hour_df[(hour_df['dteday'] >= pd.to_datetime(date_range[0])) &
-                      (hour_df['dteday'] <= pd.to_datetime(date_range[1])) &
-                      (hour_df['season_y'] == selected_season_num) &
-                      (hour_df['weathersit_y'].isin(selected_weather_num))]
+# 🏢 Filter Hari Kerja vs Akhir Pekan
+day_type = st.sidebar.radio("📅 Pilih Jenis Hari", ["Semua", "Hari Kerja", "Akhir Pekan/Hari Libur"])
 
-# Add title to the app
-st.title('Bike Sharing Dashboard')
-st.subheader('Insights and Visualizations')
+# 🔍 Terapkan Filter
+filtered_df = hour_df[
+    (hour_df['dteday'] >= pd.to_datetime(date_range[0])) &
+    (hour_df['dteday'] <= pd.to_datetime(date_range[1])) &
+    (hour_df['season_y'].isin(selected_season_num)) &
+    (hour_df['weathersit_y'].isin(selected_weather_num))
+]
 
-# Total Bike Rentals over Time
-st.header('Total Bike Rentals over Time')
-fig1, ax1 = plt.subplots(figsize=(12,6))
-filtered_df.groupby('dteday')['cnt_y'].sum().plot(ax=ax1, color='blue', marker='o')
-ax1.set_title('Total Bike Rentals Over Time')
-ax1.set_xlabel('Date')
-ax1.set_ylabel('Total Rentals')
-st.pyplot(fig1)
+if day_type == "Hari Kerja":
+    filtered_df = filtered_df[filtered_df["workingday_y"] == 1]
+elif day_type == "Akhir Pekan/Hari Libur":
+    filtered_df = filtered_df[filtered_df["workingday_y"] == 0]
 
-# Bike Rentals by Hour
-st.header('Bike Rentals by Hour of the Day')
+# 📊 Judul Dashboard
+st.title('🚲 Bike Sharing Dashboard')
+st.subheader('🔍 Eksplorasi Data dan Wawasan Menarik!')
+
+# 📅 Tren Penyewaan Sepeda Seiring Waktu (Diperbaiki)
+st.header("📅 Bagaimana Tren Penyewaan Sepeda dari Waktu ke Waktu?")
+
+# Konversi tanggal ke format datetime jika belum dilakukan
+filtered_df['dteday'] = pd.to_datetime(filtered_df['dteday'])  
+
+# Hanya gunakan kolom numerik dalam agregasi mingguan
+weekly_trend = filtered_df.resample('W', on='dteday')[filtered_df.select_dtypes(include=[np.number]).columns].mean()
+
+# Plot
+fig, ax = plt.subplots(figsize=(10, 5))
+ax.plot(weekly_trend.index, weekly_trend['cnt_y'], color='blue', linestyle='-', linewidth=2, label="Tren Mingguan")
+ax.set_title("📊 Pola Penyewaan Sepeda Seiring Waktu")
+ax.set_xlabel("📅 Waktu (Tahun/Bulan)")
+ax.set_ylabel("🚲 Jumlah Penyewaan Sepeda")
+ax.legend()
+
+st.pyplot(fig)
+
+# ⏳ Pola Penyewaan Sepeda Berdasarkan Jam
+st.header('⏰ Pola Penyewaan Sepeda Sepanjang Hari')
 fig2, ax2 = plt.subplots(figsize=(10,6))
 filtered_df.groupby('hr')['cnt_y'].mean().plot(ax=ax2, color='green', marker='o')
-ax2.set_title('Average Bike Rentals by Hour')
-ax2.set_xlabel('Hour of the Day')
-ax2.set_ylabel('Average Rentals')
+ax2.set_title('🕒 Rata-rata Penyewaan Sepeda Berdasarkan Jam')
+ax2.set_xlabel('Jam')
+ax2.set_ylabel('Jumlah Penyewaan')
 st.pyplot(fig2)
 
-# Comparison of Registered and Casual Users
-st.header('Comparison of Registered vs Casual Users')
+# 👥 Perbandingan Pengguna Terdaftar vs Kasual
+st.header('🚴‍♂️ Siapa yang Lebih Sering Menyewa?')
 fig3, ax3 = plt.subplots(figsize=(10,6))
-registered_counts = filtered_df.groupby(['mnth_y'])['registered_y'].sum()
-casual_counts = filtered_df.groupby(['mnth_y'])['casual_y'].sum()
-
-df_month = pd.DataFrame({'Registered': registered_counts, 'Casual': casual_counts})
-df_month.plot(kind='bar', color=['blue', 'orange'], ax=ax3)
-ax3.set_title('Comparison of Bike Rental Behavior (Monthly)')
-ax3.set_xlabel('Month')
-ax3.set_ylabel('Total Number of Bike Rentals')
+sns.lineplot(data=filtered_df, x='hr', y='casual_y', label='Pengguna Kasual', ax=ax3)
+sns.lineplot(data=filtered_df, x='hr', y='registered_y', label='Pengguna Terdaftar', ax=ax3)
+ax3.set_title('📊 Perbandingan Pengguna Terdaftar vs Kasual')
+ax3.set_xlabel('Jam')
+ax3.set_ylabel('Jumlah Penyewaan')
 ax3.legend()
 st.pyplot(fig3)
 
-# Clustering result visualization
-st.header('Clustering Result Visualization')
-fig4, ax4 = plt.subplots(figsize=(10,6))
-colors = ['red', 'green', 'blue']
-for i in range(3):
-    df_cluster = filtered_df[filtered_df['cluster'] == i]
-    ax4.scatter(df_cluster['hr'], df_cluster['cnt_y'], label=f'Cluster {i+1}', color=colors[i])
-ax4.set_title('Clustering Result')
-ax4.set_xlabel('Hour')
-ax4.set_ylabel('Number of Bike Rentals')
-ax4.legend()
-st.pyplot(fig4)
+# 🌦️ Cuaca dan Penyewaan Sepeda (Disederhanakan)
+st.header('🌦️ Cuaca dan Penyewaan Sepeda')
 
-# Add correlation calculation to the sidebar
-numeric_columns = filtered_df.select_dtypes(include=[np.number]).columns
-correlation = filtered_df[numeric_columns].corr()
-st.sidebar.header('Correlation Calculation')
-st.sidebar.write(correlation)
+fig, ax = plt.subplots(figsize=(10,6))
+sns.scatterplot(data=filtered_df.sample(1000),  # Mengurangi jumlah titik data untuk kejelasan
+                x='temp_y', y='cnt_y', hue='weathersit_y', 
+                palette='coolwarm', alpha=0.5, edgecolor=None, ax=ax)
+sns.regplot(data=filtered_df, x='temp_y', y='cnt_y', scatter=False, ax=ax, color='black', ci=None)
 
-# Calculate user counts
-total_casual = filtered_df['casual_y'].sum()
-total_registered = filtered_df['registered_y'].sum()
-total_users = total_casual + total_registered
+ax.set_title('🌡️ Hubungan Suhu dan Jumlah Penyewaan')
+ax.set_xlabel('Suhu (Normalisasi)')
+ax.set_ylabel('Jumlah Penyewaan')
 
-percentage_casual = (total_casual / total_users) * 100 if total_users > 0 else 0
-percentage_registered = (total_registered / total_users) * 100 if total_users > 0 else 0
+st.pyplot(fig)
 
-# Display user counts
-st.sidebar.header('User Counts')
-st.sidebar.write(f"Casual Users: {total_casual} ({percentage_casual:.2f}%)")
-st.sidebar.write(f"Registered Users: {total_registered} ({percentage_registered:.2f}%)")
 
-# Add dataset information to the sidebar
-st.sidebar.header('Dataset Information')
-st.sidebar.write('This dataset contains bike rental data including season, weather, temperature, humidity, wind speed, and user type. The dataset is filtered based on user selections.')
+# 📊 Korelasi Antar Variabel (Disederhanakan)
+st.header('📊 Hubungan Antar Variabel')
 
+# Pilih variabel yang paling relevan
+relevant_columns = ['cnt_y', 'registered_y', 'casual_y', 'temp_y', 'hum_y', 'windspeed_y']
+corr_matrix = filtered_df[relevant_columns].corr()
+
+# Sembunyikan korelasi yang terlalu kecil agar lebih fokus
+mask = np.abs(corr_matrix) < 0.5  
+corr_matrix = corr_matrix.mask(mask)
+
+fig, ax = plt.subplots(figsize=(8,5))
+sns.heatmap(corr_matrix, annot=True, cmap='coolwarm', fmt=".2f", ax=ax, linewidths=0.5)
+
+ax.set_title('🔗 Korelasi Antara Variabel Utama')
+
+st.pyplot(fig)
+
+
+# 📢 Insight Singkat di Sidebar
+st.sidebar.subheader("📌 Fakta Menarik")
+max_rentals = filtered_df['cnt_y'].max()
+min_rentals = filtered_df['cnt_y'].min()
+avg_rentals = filtered_df['cnt_y'].mean()
+st.sidebar.write(f"📈 Penyewaan terbanyak dalam satu hari: {max_rentals}")
+st.sidebar.write(f"📉 Penyewaan paling sedikit: {min_rentals}")
+st.sidebar.write(f"📊 Rata-rata penyewaan sepeda: {avg_rentals:.2f}")
+
+# 📚 Informasi Dataset
+st.sidebar.header('📖 Tentang Data Ini')
+st.sidebar.write('📂 Data ini berisi informasi penyewaan sepeda berdasarkan musim, cuaca, suhu, kelembaban, kecepatan angin, dan tipe pengguna.')
